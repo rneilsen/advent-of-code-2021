@@ -1,16 +1,15 @@
-NUM_DAYS = 80
+DAYS = [18, 80, 256]
 
-with open('test1') as f:
+with open('input') as f:
     fish = [int(val) for val in f.read().split(',')]
 
-for _ in range(NUM_DAYS):
-    new_fish = 0
-    for i in range(len(fish)):
-        if fish[i] == 0:
-            fish[i] = 6
-            new_fish += 1
-        else:
-            fish[i] -= 1
-    fish += [8] * new_fish
+num_fish = [fish.count(i) for i in range(8)]
 
-print(len(fish))
+for j in range(max(DAYS) + 1):
+    new_num_fish = [0] * 6 + [num_fish[0]] + [0] + [num_fish[0]]
+    for i in range(1, len(num_fish)):
+        new_num_fish[i-1] += num_fish[i]
+    num_fish = new_num_fish
+
+    if j in DAYS:
+        print(j, 'days:', sum(num_fish))
