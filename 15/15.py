@@ -33,41 +33,47 @@ def find_lowest_risk_path(map):
 
 
     def find_in_frontier(x, y):
-        """Finds a tuple of the index and current priority of the given 
-        coordinate pair in the frontier, or None if the given 
-        coordinate pair is not in the frontier"""
+        """Returns a tuple of the index and current priority (risk) of the 
+        given coordinate pair in the frontier, or None if the given coordinate
+        pair is not in the frontier"""
         for i in range(len(frontier)):
             fr_p, fr_x, fr_y = frontier[i]
             if fr_x == x and fr_y == y:
                 return (i, fr_p)
         return None
-            
-   
-    visited = set()
 
-    while target not in visited:
+   
+    visited = {(0,0)}
+
+    while True:
         while True:
+            # find next (non-removed) cell to visit in the frontier
             cur_risk, x, y = heappop(frontier)
             if x != REMOVED:
                 break
-        visited.add((x, y))
+
         if (x, y) == target:
             return cur_risk
+        visited.add((x, y))
 
         neighbours = get_neighbours(x, y) - visited
         for n_x, n_y in neighbours:
+            new_risk = cur_risk + map[n_x][n_y]
             if (fif := find_in_frontier(n_x, n_y)) is not None:
-                n_i, n_p = fif
-                if cur_risk + map[n_x][n_y] < n_p:
-                    frontier[n_i] = (n_p, REMOVED, REMOVED)
-                    heappush(frontier, (cur_risk + map[n_x][n_y], n_x, n_y))
+                # this neighbour is already in the frontier, update it if req'd
+                n_i, n_r = fif
+                if new_risk < n_r:
+                    frontier[n_i] = (n_r, REMOVED, REMOVED)
+                    heappush(frontier, (new_risk, n_x, n_y))
             else:
-                heappush(frontier, (cur_risk + map[n_x][n_y], n_x, n_y))
+                # this neighbour is new, add it to the frontier
+                heappush(frontier, (new_risk, n_x, n_y))
 
 print('Part 1:', find_lowest_risk_path(map), 
         f'({time.time() - start_time:0.2f} s)')
 start_time = time.time()
 
+# Tile the map for part 2
 def inc(row):
     return [(val + 1 if val < 9 else 1) for val in row]
 
