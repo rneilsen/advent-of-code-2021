@@ -57,8 +57,9 @@ def translator_to(from_v, to_v):
 
 def count_common_cols(a, b):
     """Counts the number of common columns between two matrices"""
-    common_cols = [True for col in a.T if col.tolist() in b.T.tolist()]
-    return len(common_cols)
+    a_set = {tuple(col) for col in a.T.tolist()}
+    b_set = {tuple(col) for col in b.T.tolist()}
+    return len(a_set & b_set)
 
 def attempt_match(free_map: np.ndarray, fixed_map: np.ndarray):
     """Rotates and translated free_map through every matchup with fixed_map. 
@@ -97,18 +98,19 @@ free_maps_deque = deque(free_maps.items())
 centres = set()
 while free_maps_deque:
     free_num, free_map = free_maps_deque[0]
+    print(f'Attempting to align {free_num}...', end='')
     for fixed_num, fixed_map in fixed_maps.items():
         if free_num in attempted[fixed_num]:
             continue
-        print(f'Attempting to align {free_num} to {fixed_num}...', end='')
         if (result := attempt_match(free_map, fixed_map)) is not None:
             centre = tuple(result[0].reshape(3))
             centres.add(centre)
-            print(f'aligned! Centre at {centre}')
+            print(f'aligned to {fixed_num}! Centre at {centre}')
             fixed_maps[free_num] = result[1]
             free_maps_deque.popleft()
             break
         attempted[fixed_num].add(free_num)
+    else:
         print('failed.')
     free_maps_deque.rotate(-1)
 
