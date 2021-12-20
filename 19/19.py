@@ -1,6 +1,7 @@
 import numpy as np
 from collections import deque
 from itertools import combinations
+from functools import lru_cache
 import time
 
 start_time = time.time()
@@ -55,11 +56,16 @@ def translator_to(from_v, to_v):
     """Returns the translation vector to translate one point to another"""
     return (to_v - from_v).reshape((3,1))
 
-def count_common_cols(a, b):
-    """Counts the number of common columns between two matrices"""
+def check_match(a, b):
+    """Counts the number of common columns between two matrices, and returns
+    True if it is at least COMMON_THRESHOLD, False if not"""
+    if len(set(a[0]) & set(b[0])) < COMMON_THRESHOLD:
+        # quick check on first row to discard obvious non-matches
+        return False
+
     a_set = {tuple(col) for col in a.T.tolist()}
     b_set = {tuple(col) for col in b.T.tolist()}
-    return len(a_set & b_set)
+    return len(a_set & b_set) >= COMMON_THRESHOLD
 
 def attempt_match(free_map: np.ndarray, fixed_map: np.ndarray):
     """Rotates and translated free_map through every matchup with fixed_map. 
@@ -70,7 +76,7 @@ def attempt_match(free_map: np.ndarray, fixed_map: np.ndarray):
             for fixed_point in fixed_map.T:
                 translator = translator_to(handle, fixed_point)
                 shifted_free_map = rot_free_map + translator
-                if count_common_cols(fixed_map, shifted_free_map) >= COMMON_THRESHOLD:
+                if check_match(fixed_map, shifted_free_map):
                     return (translator, shifted_free_map)
     return None
 
@@ -78,7 +84,7 @@ def manhattan_dist(point_a, point_b):
     """Returns the manhattan distance between two points"""
     return sum([abs(a - b) for a, b in zip(point_a, point_b)])
 
-free_maps = {}
+free_maps = deque()
 attempted = {}
 with open('input') as f:
     while line := f.readline().strip():
@@ -90,14 +96,13 @@ with open('input') as f:
         while (line := f.readline().strip()) != '':
             raw_beacons.append([int(val) for val in line.split(',')])
         
-        free_maps[scanner_num] = np.array(raw_beacons).transpose()
+        free_maps.append((scanner_num, np.array(raw_beacons).transpose()))
         attempted[scanner_num] = set()
 
-fixed_maps = {0: free_maps.pop(0)}
-free_maps_deque = deque(free_maps.items())
+fixed_maps = {0: free_maps.popleft()[1]}
 centres = set()
-while free_maps_deque:
-    free_num, free_map = free_maps_deque[0]
+while free_maps:
+    free_num, free_map = free_maps[0]
     print(f'Attempting to align {free_num}...', end='')
     for fixed_num, fixed_map in fixed_maps.items():
         if free_num in attempted[fixed_num]:
@@ -105,14 +110,14 @@ while free_maps_deque:
         if (result := attempt_match(free_map, fixed_map)) is not None:
             centre = tuple(result[0].reshape(3))
             centres.add(centre)
-            print(f'aligned to {fixed_num}! Centre at {centre}')
             fixed_maps[free_num] = result[1]
-            free_maps_deque.popleft()
+            free_maps.popleft()
+            print(f'aligned to {fixed_num}! Centre at {centre}. {len(free_maps)} remaining.')
             break
         attempted[fixed_num].add(free_num)
     else:
-        print('failed.')
-    free_maps_deque.rotate(-1)
+        print('no match yet.')
+    free_maps.rotate(-1)
 
 beacons = set()
 for fixed_map in fixed_maps.values():
