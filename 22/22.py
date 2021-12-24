@@ -1,7 +1,7 @@
-import re
+import re, time
+start_time = time.time()
 
-with open('test2') as f:
-    rows = [row.strip() for row in f.readlines()]
+THRESHOLD = 50
 
 class Cuboid:
     def __init__(self, *args):
@@ -10,9 +10,17 @@ class Cuboid:
             if isinstance(coord_range, range):
                 self.ranges.append(coord_range)
             else:
-                vals = [int(val) for val in coord_range]
-                self.ranges.append(range(min(vals), max(vals) + 1))
+                self.ranges.append(range(int(coord_range[0]), int(coord_range[1]) + 1))
     
+    def __hash__(self):
+        return hash(tuple(self.ranges))
+
+    def __len__(self):
+        size = 1
+        for r in self.ranges:
+            size *= (max(r) - min(r) + 1)
+        return size
+
     def __str__(self):
         return 'Cuboid(' + ','.join([f'({min(r)},{max(r)})' for r in self.ranges]) + ')'
 
@@ -34,7 +42,7 @@ def intersect(a: Cuboid, b: Cuboid) -> tuple[list[Cuboid], Cuboid, list[Cuboid]]
     for i in range(num_dims):
         # if any dimension has zero overlap, the cuboids do not intersect at all
         if min(a.ranges[i]) > max(b.ranges[i]) or max(a.ranges[i]) < min(b.ranges[i]):
-            return ([], a, [])
+            return ([a], None, [b])
     
     a_rem = []
     b_rem = []
@@ -71,6 +79,9 @@ def intersect(a: Cuboid, b: Cuboid) -> tuple[list[Cuboid], Cuboid, list[Cuboid]]
     return (a_rem, intersection, b_rem)
 
 
+with open('input') as f:
+    rows = [row.strip() for row in f.readlines()]
+
 blocks = []
 for row in rows:
     mode, coords = row.split(' ')
@@ -79,6 +90,53 @@ for row in rows:
     for r in raw_ranges:
         m = re.match(r'\w=([-\d]+)..([-\d]+)', r)
         ranges.append(m.groups())
-    blocks.append(((1 if mode == 'on' else 0), *ranges))
+    blocks.append(((1 if mode == 'on' else 0), Cuboid(*ranges)))
 
-print(blocks)
+processed, to_process = 0, len(blocks)
+on_blocks = set()
+while True:
+    processed += 1
+    block = blocks.pop(0)
+    if block[0] == 1:
+        break
+on_blocks.add(block[1])
+
+for state, block in blocks:
+    processed += 1
+    print(  f'Processing block {processed}/{to_process}: {(state, block)},',
+            f'{len(on_blocks)} on_blocks so far ({time.time() - start_time:0.2f} s)')
+    new_on_blocks = set()
+    if state == 1:
+        while on_blocks:
+            on_block = on_blocks.pop()
+            intersection = intersect(on_block, block)
+            if len(intersection[2]) == 0:
+                new_on_blocks.add(on_block)
+                new_on_blocks.update(on_blocks)
+                break
+            if intersection[1] is None:
+                new_on_blocks.add(on_block)
+                continue
+            new_on_blocks.update(intersection[0])
+        else:
+            new_on_blocks.add(block)
+    else:
+        while on_blocks:
+            on_block = on_blocks.pop()
+            intersection = intersect(on_block, block)
+            if intersection[1] is None:
+                new_on_blocks.add(on_block)
+                continue
+            new_on_blocks.update(intersection[0])
+    on_blocks, new_on_blocks = new_on_blocks, on_blocks
+
+p1total = total = 0
+for block in on_blocks:
+    size = len(block)
+    if max([max(abs(min(r)), abs(max(r))) for r in block.ranges]) <= THRESHOLD:
+        p1total += size
+    total += size
+
+print('PART 1:', p1total)
+print('PART 2:', total)
+print(f'Completed in {time.time() - start_time:0.2f} s')
